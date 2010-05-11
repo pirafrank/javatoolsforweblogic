@@ -13,7 +13,7 @@ import java.util.zip.ZipFile;
 public class JarSearcher {
 	public static void main(String[] args) throws Exception {
 		JarSearcher jarSearcher = new JarSearcher();
-		jarSearcher.findTest("C:\bea103osb", "pipelineMonitoringLevel");
+		jarSearcher.findTest("C:\\bea103osb", "pipelineMonitoringLevel");
 	}
 
 	private void findTest(String dirString, String text) throws ZipException, IOException {
@@ -25,15 +25,14 @@ public class JarSearcher {
 			else {
 				String name = f.getName();
 				if (name.endsWith(".jar") || name.endsWith(".zip")) {
-					System.out.println("NAME" + name);
+					System.out.println("SEARCHING " + f.getAbsolutePath());
 					ZipFile zipFile = new ZipFile(f);
 					Enumeration<? extends ZipEntry> e =  zipFile.entries();
 					while (e.hasMoreElements()) {
 						ZipEntry nextElement = e.nextElement();
-						System.out.println("ENTRY " + nextElement.getName());
 						InputStream is = zipFile.getInputStream(nextElement);
 						if (findInInputStream(is, text)) {
-							System.out.println("FOUND!!!");
+							System.out.println("FOUND ENTRY " + nextElement.getName());
 						}
 					}
 				}
