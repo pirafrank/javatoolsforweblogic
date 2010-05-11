@@ -32,7 +32,7 @@ public class JarSearcher {
 						ZipEntry nextElement = e.nextElement();
 						InputStream is = zipFile.getInputStream(nextElement);
 						if (findInInputStream(is, text)) {
-							System.out.println("FOUND ENTRY " + nextElement.getName());
+							System.out.println("FOUND ENTRY " + nextElement.getName() + " in file " + f.getAbsolutePath());
 						}
 					}
 				}
