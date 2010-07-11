@@ -27,4 +27,14 @@ public class XMLLoader <T> {
 		result = (T)unmarshaller.unmarshal(new File(fileName));
 		return result;
 	}
+
+	public T getObjectFromString(Class theClass, String theXML) throws JAXBException {
+		T result = null;
+		JAXBContext jc = JAXBContext.newInstance(theClass);
+		Unmarshaller unmarshaller = jc.createUnmarshaller();
+		byte[] bytes = theXML.getBytes();
+		ByteArrayInputStream bais = new ByteArrayInputStream(bytes);
+		result = (T)unmarshaller.unmarshal(bais);
+		return result;
+	}
 }
