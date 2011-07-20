@@ -1,4 +1,4 @@
-package com.maersk.jmx;
+package com.acme.jmx;
 
 public interface HelloMBean {
 

@@ -1,4 +1,4 @@
-package com.maersk.jmx;
+package com.acme.jmx;
 
 import javax.management.*;
 import java.lang.management.*;
