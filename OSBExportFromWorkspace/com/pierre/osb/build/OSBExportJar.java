@@ -13,6 +13,7 @@ import java.util.Comparator;
 import java.util.List;
 
 public class OSBExportJar {
+	final String XML_PREAMBLE = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>";
 
 	Comparator<Include> comparatorInclude = new Comparator<Include>() {
 
@@ -30,19 +31,105 @@ public class OSBExportJar {
 		}
 	};
 
+	/**
+	 * Identifies each file in build 
+	 * @author EXB866
+	 *
+	 */
+	class Resource {
+		String path;
+		EXTENSIONS type;
+		List<String> dependencies;
+		public String getPath() {
+			return path;
+		}
+		
+		public String getPathWithExtension() {
+			return path + "." + getType().getLongName();
+		}
+				
+		public void setPath(String path) {
+			this.path = path;
+		}
+		public EXTENSIONS getType() {
+			return type;
+		}
+		public void setType(EXTENSIONS type) {
+			this.type = type;
+		}
+		public List<String> getDependencies() {
+			return dependencies;
+		}
+		public void setDependencies(List<String> dependencies) {
+			this.dependencies = dependencies;
+		}
 
-	public enum EXTENSIONS {
-		sa, mqc, biz, proxy, xq, alert, xsd, wsdl
+		public Resource(String path, EXTENSIONS type) {
+			this.path = path;
+			this.type = type;
+		}
+
 	}
 
-	List<String> resources = new ArrayList<String>();
+	@SuppressWarnings("serial")
+	class ListResource extends ArrayList<Resource> {
+
+		public List<String> getAllPaths() {
+			List<String> result = new ArrayList<String>();
+			for (Resource res : this) {
+				result.add(res.getPath());
+			}
+			return result;
+		}
+
+	}
+
+	public enum EXTENSIONS {
+		sa("ServiceAccount", "com.bea.wli.sb.svcacct.StaticServiceAccountConfig", "25"), 
+		mqc("MQConnection", "com.bea.wli.sb.resources.custom.ResourceDataObject", "30"), 
+		biz("BusinessService", "com.bea.wli.sb.services.impl.ServiceDefinitionImpl", "3000"), 
+		proxy("ProxyService", "com.bea.wli.sb.services.impl.ServiceDefinitionImpl", "3000"), 
+		xq("Xquery", "com.bea.wli.sb.resources.config.impl.XqueryEntryDocumentImpl", "0"), 
+		alert("AlertDestination", "com.bea.wli.monitoring.alert.impl.AlertDestinationImpl", "30"), 
+		xsd("XMLSchema", "com.bea.wli.sb.resources.config.impl.SchemaEntryDocumentImpl", "0"), 
+		wsdl("WSDL", "com.bea.wli.sb.resources.config.impl.WsdlEntryDocumentImpl", "0"),
+		_folderdata("LocationData", "com.bea.wli.config.project.impl.LocationDataImpl", "0"),
+		_projectdata("LocationData", "com.bea.wli.config.project.impl.LocationDataImpl", "0");
+
+		private final String longName;
+		private final String implementation;
+		private final String representationversion;
+
+		EXTENSIONS(String longName, String implementation, String representationversion) {
+			this.longName = longName;
+			this.implementation = implementation;
+			this.representationversion = representationversion;
+		}
+
+		public String getLongName() {
+			return longName;
+		}
+
+		public String getImplementation() {
+			return implementation;
+		}
+
+		public String getRepresentationversion() {
+			return representationversion;
+		}
+
+
+	}
+
+	ListResource resources = new ListResource();
+
 	String theWorkspace = null; 
 
 	public static void main(String[] args) throws Exception {
 		String previous = System.getProperty("line.separator");
 		System.setProperty("line.separator", "\n");
 		OSBExportJar exportJar = new OSBExportJar();
-		exportJar.export("C:/pierre/workspaceSVN/", "GlobalResources,GUTools,InterfacesGU,InterfacesBLA,MockBLA", "c:/tmp/", "pvexport.jar");
+		exportJar.export("C:/pierre/workspaceSVN/", "GlobalResources,GUTools,InterfacesGU,InterfacesFRO,MockFRO", "c:/tmp/", "pvexport.jar");
 		System.setProperty("line.separator", previous);
 	}
 
@@ -114,7 +201,8 @@ public class OSBExportJar {
 				// make sure you exclude .project 
 				if (!fileName.startsWith(".")) {
 					String absolutePath = file.getAbsolutePath().replaceAll("\\\\", "/");
-					resources.add(absolutePath.substring(theWorkspace.length()));
+					String extension = getExtensionFromFilename(fileName);
+					resources.add(new Resource(absolutePath.substring(theWorkspace.length()), EXTENSIONS.valueOf(extension) ));
 				}
 			}
 		}
@@ -137,11 +225,7 @@ public class OSBExportJar {
 				String fileName = file.getName();
 				// make sure you exclude .project 
 				if (!fileName.startsWith(".")) {
-					String[] elements = fileName.split("\\.");
-					String extension = "";
-					if (elements.length > 0) {
-						extension = elements[elements.length - 1];
-					}
+					String extension = getExtensionFromFilename(fileName);
 					String beforeExtension = fileName.substring(0, fileName.lastIndexOf("." + extension));
 					String newExtension = mapExtension(extension);
 					String newFileName = beforeExtension + "." + newExtension;
@@ -153,22 +237,12 @@ public class OSBExportJar {
 	}
 
 	private String mapExtension(String extension) throws Exception {
-		List<String> beforeList = Arrays.asList(new String[] {EXTENSIONS.sa.name(), EXTENSIONS.mqc.name(), EXTENSIONS.biz.name(), EXTENSIONS.proxy.name(), EXTENSIONS.xq.name(), EXTENSIONS.alert.name(), EXTENSIONS.xsd.name(), EXTENSIONS.wsdl.name()});
-		List<String> afterList = Arrays.asList(new String[] {"ServiceAccount", "MQConnection", "BusinessService", "ProxyService", "Xquery", "AlertDestination", "XMLSchema", "WSDL"});
-		String result = "";
-		int index = beforeList.indexOf(extension);
-		if (index >= 0) {
-			result = afterList.get(index);
-		}
-		else {
-			throw new Exception("unable to map extension " + extension);
-		}
-		return result;
+		return EXTENSIONS.valueOf(extension).getLongName();
 	}
 
 	private void doLocationData(File outDir, boolean isFolderData) throws Exception {
 		String filename = isFolderData? "_folderdata.LocationData" : "_projectdata.LocationData";
-		String fileContent = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<proj:isImmutable xmlns:proj=\"http://www.bea.com/wli/config/project\">false</proj:isImmutable>";
+		String fileContent = XML_PREAMBLE + "\n<proj:isImmutable xmlns:proj=\"http://www.bea.com/wli/config/project\">false</proj:isImmutable>";
 		File file = new File(outDir, filename);
 		BufferedWriter out = new BufferedWriter(new FileWriter(file));
 		out.write(fileContent);
@@ -210,13 +284,13 @@ public class OSBExportJar {
 		BufferedWriter writer = new BufferedWriter(new FileWriter(dst));
 		switch (ext) {
 		case xq:
-			writer.write("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<con:xqueryEntry xmlns:con=\"http://www.bea.com/wli/sb/resources/config\">\n<con:xquery><![CDATA[");
+			writer.write(XML_PREAMBLE + "\n<con:xqueryEntry xmlns:con=\"http://www.bea.com/wli/sb/resources/config\">\n<con:xquery><![CDATA[");
 			break;
 		case xsd:
-			writer.write("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<con:schemaEntry xmlns:con=\"http://www.bea.com/wli/sb/resources/config\">\n    <con:schema><![CDATA[");
+			writer.write(XML_PREAMBLE + "\n<con:schemaEntry xmlns:con=\"http://www.bea.com/wli/sb/resources/config\">\n    <con:schema><![CDATA[");
 			break;
 		case wsdl:
-			writer.write("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<con:wsdlEntry xmlns:con=\"http://www.bea.com/wli/sb/resources/config\">\n<con:wsdl><![CDATA[");
+			writer.write(XML_PREAMBLE + "\n<con:wsdlEntry xmlns:con=\"http://www.bea.com/wli/sb/resources/config\">\n<con:wsdl><![CDATA[");
 		}
 
 		// check for "pragma bea:global-element-parameter"
@@ -228,27 +302,27 @@ public class OSBExportJar {
 			case xq:
 				String location = getLocationFromPragma(line);
 				if (location != null && !xqLocations.contains(location)) xqLocations.add(location);
-			
+
 				break;
-				
+
 			case xsd:
 				Include dependencyInclude = getDependencyFromInclude(line);
 				if (dependencyInclude != null) xsdIncludes.add(dependencyInclude);
 				Import dependencyImport = getDependencyFromImport(line);
 				if (dependencyImport != null) xsdImports.add(dependencyImport);
-				
+
 				String xsdGuessNamespace = findNamespace(line);
 				if (xsdGuessNamespace != null && xsdNamespace == null) {
 					xsdNamespace = xsdGuessNamespace;
 				}					
 				break;
-				
+
 			case wsdl:
 				String wsdlGuessNamespace = findNamespace(line);
 				if (wsdlGuessNamespace != null && wsdlNamespace == null) {
 					wsdlNamespace = wsdlGuessNamespace;
 				}
-				//  <wsdl:import namespace="http://www.acme.com/U200/BLA" location="InfraServices0.wsdl"/>
+				//  <wsdl:import namespace="http://www.acme.be/A204/FRO" location="InfraServices0.wsdl"/>
 				Import wsdlXsdDependencyImport = getXSDWSDLDependencyFromImport(line);
 				if (wsdlXsdDependencyImport != null) wsdlXsdImports.add(wsdlXsdDependencyImport);
 				Import wsdlDependencyImport = getWSDLDependencyFromImport(line);
@@ -308,7 +382,7 @@ public class OSBExportJar {
 					writer.write("\n        <con:import location=\"" + imp.schemaLocation + "\" namespace=\"" + imp.namespace + "\">");
 					writer.write("\n        <con:wsdl ref=\"" + imp.ref + "\"/>");
 					writer.write( "\n</con:import>");
-					
+
 				}				
 				writer.write("\n    </con:dependencies>");
 				if (wsdlNamespace != null) {
@@ -324,7 +398,7 @@ public class OSBExportJar {
 		writer.close();
 	}
 
-//  <xsd:schema targetNamespace="http://www.acme.com/U304/BLA/Imports">
+	//  <xsd:schema targetNamespace="http://www.acme.be/A204/FRO/Imports">
 	private String findNamespace(String line) {
 		String result = null;
 		if (line.contains("schema") && line.contains("targetNamespace=")) {
@@ -346,7 +420,7 @@ public class OSBExportJar {
 		}
 		return result;		
 	}
-	
+
 	private Import getWSDLDependencyFromImport(String maybeImport) {
 		Import result = null;
 		if ( maybeImport.contains("wsdl:import") && maybeImport.contains("namespace") && maybeImport.contains("location") ) {
@@ -375,7 +449,7 @@ public class OSBExportJar {
 		return result;		
 	}
 
-	// input is ../CommonSchemas/Serialization.xsd, output is InterfacesBLA/CommonSchemas/Serialization
+	// input is ../CommonSchemas/Serialization.xsd, output is InterfacesFRO/CommonSchemas/Serialization
 	public String getRefForSchema(String schemaLocation) {
 		int beginIndex = schemaLocation.lastIndexOf("/");
 
@@ -390,7 +464,7 @@ public class OSBExportJar {
 			result = null;
 		}
 		try {
-			for (String res : resources) {
+			for (String res : resources.getAllPaths()) {
 				if (res.endsWith("/" + refName)) {
 					result = res;
 					break;
@@ -437,7 +511,7 @@ public class OSBExportJar {
 		return result;		
 	}	
 
-	// (:: pragma bea:global-element-parameter parameter="$retrieveBookDetailsByIdResponse1" element="ns0:RetrieveBookDetailsByIdResponse" location="../../InterfacesBLA/SearchByBookService/BLA.xsd" ::)
+	// (:: pragma bea:global-element-parameter parameter="$retrieveBookDetailsByIdResponse1" element="ns0:RetrieveBookDetailsByIdResponse" location="../../InterfacesFRO/SearchByBookService/FRO.xsd" ::)
 
 	public static String getLocationFromPragma(String maybePragma) {
 		String result = null;
@@ -461,5 +535,50 @@ public class OSBExportJar {
 	class Include {
 		String schemaLocation;
 		String ref;
-	}	
+	}
+
+
+	private String buildExportInfo() {
+		StringBuilder result = new StringBuilder();
+		result.append(XML_PREAMBLE + "\n");
+		result.append("<xml-fragment name=\"\" version=\"v2\">\n");
+		result.append("      <imp:properties xmlns:imp=\"http://www.bea.com/wli/config/importexport\">");
+		result.append("            <imp:property name=\"username\" value=\"pierluigi\"/>");
+		result.append("            <imp:property name=\"description\" value=\"\"/>");
+		result.append("            <imp:property name=\"exporttime\" value=\"Tue Jul 26 10:31:07 CEST 2011\"/>");
+		result.append("            <imp:property name=\"productname\" value=\"Oracle Service Bus\"/>");
+		result.append("            <imp:property name=\"productversion\" value=\"11.1.1.4\"/>");
+		result.append("            <imp:property name=\"projectLevelExport\" value=\"true\"/>");
+		result.append("      </imp:properties>");
+
+		for (Resource res: resources) {
+			result.append("<imp:exportedItemInfo instanceId=\"" + res.getPath() + "\" typeId=\"" + res.getType().name() +  "\" xmlns:imp=\"http://www.bea.com/wli/config/importexport\">");
+
+			result.append("<imp:properties>");
+			result.append("<imp:property name=\"representationversion\" value=\"" + res.getType().getRepresentationversion() + "\"/>");
+			result.append("<imp:property name=\"dataclass\" value=\"" + res.getType().getImplementation() + "\"/>");
+			result.append("<imp:property name=\"isencrypted\" value=\"false\"/>");
+			result.append("<imp:property name=\"jarentryname\" value=\"" + res.getPathWithExtension() + "\"/>");
+			
+			for (String dep : res.getDependencies()) {
+				result.append("<imp:property name=\"extrefs\" value=\"" + dep + "\"/>\n");
+			}
+			
+			result.append("/<imp:properties>");
+			result.append("<imp:exportedItemInfo>");
+
+		}
+
+		return result.toString();
+	}
+
+
+	private static String getExtensionFromFilename(String fileName) {
+		String[] elements = fileName.split("\\.");
+		String extension = "";
+		if (elements.length > 0) {
+			extension = elements[elements.length - 1];
+		}
+		return extension;
+	}
 }
